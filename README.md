@@ -4,7 +4,62 @@ A lightweight, headless APRS station, mapping, messaging, telemetry, weather, an
 
 YWD-APRS is inspired by the capabilities of classic APRS applications such as Xastir, but is designed as a daemon-first service for Raspberry Pi and other Linux systems. The radio and APRS engine keep running independently of any browser session; the browser is simply the control and visualization console.
 
-> **Project status:** early development / pre-alpha. The current development target is the RX-only 0A foundation.
+> **Project status:** active pre-alpha development on `dev`. The current `0A / early-0B` checkpoint is RX-only and ready for TCP KISS physical receive testing.
+
+## Current working receive slice
+
+The current development branch implements:
+
+```text
+TCP KISS
+   ↓
+KISS framing
+   ↓
+AX.25 decoding
+   ↓
+APRS classification / position decoding
+   ↓
+station + packet state
+   ↓
+append-only normalized JSONL RX log
+   ↓
+HTTP API
+   ↓
+YWD browser map / Last Heard / packet monitor
+```
+
+The current gate is **receive-only by construction**:
+
+- the KISS client exposes no transmit/write API;
+- no beacon or messaging scheduler exists;
+- `tx.enabled: true` is rejected during configuration validation;
+- the browser UI explicitly reports `RX ONLY // TX PATH ABSENT`.
+
+## Quick development install
+
+On Debian or Raspberry Pi OS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/merberg-ai/ywd-aprs/dev/scripts/install-dev.sh | sudo bash
+```
+
+The default development configuration targets the current YWD-MMDVM-TNC TCP KISS endpoint:
+
+```yaml
+kiss:
+  host: 192.168.1.11
+  port: 8001
+  kiss_port: 0
+```
+
+Then:
+
+```bash
+ywd-aprsctl doctor
+journalctl -fu ywd-aprs
+```
+
+Open `http://<host-ip>:8080/` in a browser. See [docs/PHYSICAL-TEST-0A.md](docs/PHYSICAL-TEST-0A.md) for the physical acceptance procedure and included synthetic KISS smoke test.
 
 ## Goals
 
@@ -17,20 +72,19 @@ YWD-APRS is inspired by the capabilities of classic APRS applications such as Xa
 - Maintain strict separation between KISS transport, AX.25 framing, APRS decoding, station state, persistence, and UI/API layers.
 - Keep RF transmit paths explicit and safe; early milestones are RX-only.
 
-## Planned architecture
+## Architecture direction
 
 ```text
 Browser / phone / tablet
           |
-    HTTP + WebSocket
+        HTTP
           |
       ywd-aprsd
           |
   +-------+------------------------------+
   | APRS engine                         |
-  | station state / messages / WX       |
-  | telemetry / objects / history       |
-  | SQLite / API / configuration        |
+  | station state / packet history      |
+  | API / configuration / logging       |
   +------------------+------------------+
                      |
                   AX.25
@@ -44,59 +98,48 @@ Browser / phone / tablet
                      RF
 ```
 
-The browser is intentionally not part of the radio-processing path. Closing the browser must not stop receiving, decoding, logging, beaconing, messaging, or IGate operation once those features are implemented.
+The browser is intentionally not part of the radio-processing path. Closing it does not stop the daemon.
 
-## Initial technology direction
+## Current technology
 
-- **Backend:** Go
-- **Frontend:** TypeScript with a lightweight component framework
-- **Map:** Leaflet-compatible browser mapping
-- **Database:** SQLite
-- **Live updates:** WebSocket
+- **Backend:** Go, standard library only at the current gate
+- **Frontend:** embedded HTML/CSS/JavaScript
+- **Map:** Leaflet + OpenStreetMap tiles during development
+- **Current persistence:** normalized JSONL RX log plus in-memory station state
+- **Planned persistence:** SQLite
 - **API:** JSON HTTP API
 - **Service management:** systemd
 - **Primary modem interface:** TCP KISS
 
-The final frontend will be built ahead of release and embedded into the daemon so normal installations do not require Node.js, npm, or a development toolchain.
+The frontend is embedded into the daemon, so normal installations do not require Node.js or npm.
 
 ## Development milestones
 
 ### 0A - RX foundation
 
-The first milestone proves the complete receive spine while keeping transmit disabled:
-
-```text
-TCP KISS -> KISS decode -> AX.25 decode -> APRS decode -> SQLite -> API/WebSocket
-```
-
-Initial 0A work includes:
-
-- daemon and configuration skeleton
+- daemon and configuration
 - TCP KISS client with reconnect handling
 - KISS framing/deframing
-- AX.25 UI frame decoding
-- initial APRS position decoding
-- normalized APRS event model
-- SQLite persistence
-- HTTP/WebSocket event path
-- raw packet monitor foundation
+- AX.25 decoding and TNC2 rendering
+- initial APRS decoding
+- receive packet logging
+- HTTP/API state path
+- packet monitor foundation
 - protocol fixtures and regression tests
 - **no RF transmit path**
 
-### 0B - Live map
+### 0B - Live map and persistent domain state
 
-- browser application shell
-- live APRS map
-- APRS symbols and overlays
-- Last Heard
-- station inspector
-- station aging
-- position history and trails
+- richer map and APRS symbols/overlays
+- station inspector and aging
+- SQLite station/packet/position history
+- trails and historical playback
+- live event transport instead of polling
 
 ### 0C - APRS decoding parity
 
-- Mic-E
-- compressed positions
+- full Mic-E decode
+- compressed-position edge cases
 - objects and items
 - weather
 - telemetry
@@ -114,8 +157,7 @@ Initial 0A work includes:
 
 ### 0E - APRS-IS and IGate
 
-- APRS-IS client
-- filters
+- APRS-IS client and filters
 - duplicate suppression
 - RF-to-IS gating
 - policy-controlled IS-to-RF gating
@@ -123,16 +165,14 @@ Initial 0A work includes:
 
 ### 0F - Productization
 
-- installer and uninstaller
-- updater with rollback
+- stable installer and updater with rollback
 - backup/restore
-- `ywd-aprsctl` diagnostics and service controls
-- first-run setup wizard
+- first-run browser setup wizard
 - authentication / remote administration controls
 - offline map support
 - release binaries for common Linux architectures
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the working roadmap and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design rules.
+See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Branch policy
 
@@ -140,25 +180,11 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the working roadmap and [docs/ARCHITE
 - `dev` - active development integration branch
 - feature/checkpoint branches - short-lived work derived from `dev`
 
-Development should land on `dev` first and move to `main` only at deliberate checkpoints/releases.
-
-## Intended deployment
-
-A normal packaged installation is expected to look approximately like:
-
-```text
-/usr/local/bin/ywd-aprsd
-/usr/local/bin/ywd-aprsctl
-/etc/ywd-aprs/config.yaml
-/var/lib/ywd-aprs/ywd-aprs.db
-/etc/systemd/system/ywd-aprs.service
-```
-
-The long-term goal is a one-command installer followed by browser-based setup.
+Development lands on `dev` first and moves to `main` only at deliberate checkpoints/releases.
 
 ## RF safety
 
-YWD-APRS will eventually transmit APRS frames. Development milestones must treat transmit capability as an explicit feature, not an incidental side effect. RX-only stages must not contain an active RF transmit path. Later TX functions will have master and per-feature controls and will require deliberate configuration.
+YWD-APRS will eventually transmit APRS frames. Development milestones treat transmit capability as an explicit feature, not an incidental side effect. RX-only stages must not contain an active RF transmit path. Later TX functions will have master and per-feature controls and require deliberate configuration.
 
 Operators are responsible for configuring station identity, frequency, paths, beacon rates, IGate policy, and transmissions in accordance with applicable amateur-radio rules and local network practices.
 
