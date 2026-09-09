@@ -1,0 +1,20 @@
+[Unit]
+Description=YWD-APRS headless APRS station
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ywd-aprs
+Group=ywd-aprs
+ExecStart=/usr/local/bin/ywd-aprsd -config /etc/ywd-aprs/config.yaml
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ywd-aprs
+
+[Install]
+WantedBy=multi-user.target

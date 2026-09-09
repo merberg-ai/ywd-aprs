@@ -1,0 +1,28 @@
+# YWD-APRS development configuration.
+# 0A/0B is RECEIVE ONLY. tx.enabled=true is deliberately rejected.
+
+station:
+  callsign: KJ6YWD-10
+  # Used only as the initial map center until an APRS position is heard.
+  latitude: 40.5865
+  longitude: -122.3917
+
+kiss:
+  host: 192.168.1.11
+  port: 8001
+  kiss_port: 0
+  reconnect_seconds: 3
+
+web:
+  listen: ":8080"
+  title: YWD-APRS
+
+logging:
+  packet_file: /var/lib/ywd-aprs/packets.jsonl
+
+maps:
+  tile_url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  attribution: "OpenStreetMap contributors"
+
+tx:
+  enabled: false
