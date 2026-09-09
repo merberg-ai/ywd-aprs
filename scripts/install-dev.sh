@@ -53,7 +53,11 @@ fi
 install -o root -g root -m 0644 packaging/systemd/ywd-aprs.service /etc/systemd/system/ywd-aprs.service
 /usr/local/bin/ywd-aprsd -config "$CONF_DIR/config.yaml" -check
 systemctl daemon-reload
-systemctl enable --now ywd-aprs.service
+systemctl enable ywd-aprs.service
+# Always restart after replacing the embedded daemon binary. `enable --now` alone
+# does not restart an already-running service, which can leave the old daemon/UI
+# serving even though ywd-aprsctl has been updated.
+systemctl restart ywd-aprs.service
 sleep 1
 
 echo
