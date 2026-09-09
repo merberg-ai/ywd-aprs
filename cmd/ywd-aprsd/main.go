@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -65,7 +66,10 @@ func main() {
 			log.Printf("AX25 decode: %v raw=%x", err, payload)
 			return
 		}
-		decoded := aprs.Decode(frame.Info, frame.Destination.String())
+		decoded := aprs.Packet{Kind: "ax25-" + strings.ToLower(frame.FrameType())}
+		if frame.IsAPRSUI() {
+			decoded = aprs.Decode(frame.Info, frame.Destination.String())
+		}
 		packet := st.Ingest(port, frame, decoded)
 		if err := pktlog.Write(packet); err != nil {
 			log.Printf("packet log write: %v", err)

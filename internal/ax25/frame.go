@@ -25,13 +25,15 @@ type Frame struct {
 	Source      Address   `json:"source"`
 	Path        []Address `json:"path,omitempty"`
 	Control     byte      `json:"control"`
-	PID         byte      `json:"pid"`
+	PID         byte      `json:"pid,omitempty"`
+	HasPID      bool      `json:"has_pid"`
 	Info        []byte    `json:"-"`
 	RawHex      string    `json:"raw_hex"`
 }
 
 func Decode(raw []byte) (Frame, error) {
-	if len(raw) < 16 {
+	// Two addresses (14 bytes) + one control byte is a valid short S/U frame.
+	if len(raw) < 15 {
 		return Frame{}, errors.New("AX.25 frame too short")
 	}
 	var addrs []Address
@@ -64,16 +66,66 @@ func Decode(raw []byte) (Frame, error) {
 		f.Path = append([]Address(nil), addrs[2:]...)
 	}
 	offset++
-	// APRS normally uses UI (0x03) with PID 0xF0. For other U/I frames,
-	// retaining the next byte as PID is still useful to the monitor.
-	if offset < len(raw) {
+	if controlHasPID(f.Control) {
+		if offset >= len(raw) {
+			return Frame{}, fmt.Errorf("%s frame missing PID", f.FrameType())
+		}
 		f.PID = raw[offset]
+		f.HasPID = true
 		offset++
-	}
-	if offset <= len(raw) {
-		f.Info = append([]byte(nil), raw[offset:]...)
+		if offset < len(raw) {
+			f.Info = append([]byte(nil), raw[offset:]...)
+		}
 	}
 	return f, nil
+}
+
+func controlHasPID(control byte) bool {
+	if control&0x01 == 0 {
+		return true
+	} // I frame, modulo-8 control
+	return control&0xEF == 0x03 // UI frame, ignore P/F bit
+}
+
+func (f Frame) IsAPRSUI() bool { return f.Control&0xEF == 0x03 && f.HasPID && f.PID == 0xF0 }
+
+func (f Frame) FrameType() string {
+	c := f.Control
+	if c&0x01 == 0 {
+		return "I"
+	}
+	if c&0x03 == 0x01 {
+		switch (c >> 2) & 0x03 {
+		case 0:
+			return "RR"
+		case 1:
+			return "RNR"
+		case 2:
+			return "REJ"
+		case 3:
+			return "SREJ"
+		}
+	}
+	switch c & 0xEF {
+	case 0x03:
+		return "UI"
+	case 0x2F:
+		return "SABM"
+	case 0x43:
+		return "DISC"
+	case 0x63:
+		return "UA"
+	case 0x0F:
+		return "DM"
+	case 0x87:
+		return "FRMR"
+	case 0xAF:
+		return "XID"
+	case 0xE3:
+		return "TEST"
+	default:
+		return fmt.Sprintf("U-%02X", c&0xEF)
+	}
 }
 
 func decodeAddress(b []byte) (Address, bool, error) {

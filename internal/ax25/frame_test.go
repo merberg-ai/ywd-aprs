@@ -33,7 +33,32 @@ func TestDecodeUI(t *testing.T) {
 	if f.Source.String() != "KJ6YWD-9" || f.Destination.String() != "APRS" || len(f.Path) != 1 || !f.Path[0].Repeated {
 		t.Fatalf("unexpected frame: %+v", f)
 	}
+	if !f.IsAPRSUI() || f.FrameType() != "UI" {
+		t.Fatalf("not APRS UI: %+v", f)
+	}
 	if f.TNC2() != "KJ6YWD-9>APRS,WIDE1-1*:!4050.00N/12220.00W>test" {
 		t.Fatalf("tnc2=%q", f.TNC2())
+	}
+}
+func TestDecodeShortRR(t *testing.T) {
+	raw := append(encAddr("KJ6YWD", 5, false, false), encAddr("KE6CHO", 5, true, false)...)
+	raw = append(raw, 0x81) // RR, N(R)=4, P/F=0
+	f, err := Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.FrameType() != "RR" || f.HasPID || len(f.Info) != 0 {
+		t.Fatalf("bad RR: %+v type=%s", f, f.FrameType())
+	}
+}
+func TestDecodeUA(t *testing.T) {
+	raw := append(encAddr("KJ6YWD", 10, false, false), encAddr("KJ6YWD", 5, true, false)...)
+	raw = append(raw, 0x63)
+	f, err := Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.FrameType() != "UA" || f.HasPID {
+		t.Fatalf("bad UA: %+v", f)
 	}
 }

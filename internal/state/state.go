@@ -21,6 +21,9 @@ type Packet struct {
 	Info        string    `json:"info"`
 	RawHex      string    `json:"raw_hex"`
 	Kind        string    `json:"kind"`
+	FrameType   string    `json:"frame_type"`
+	Control     byte      `json:"control"`
+	PID         byte      `json:"pid,omitempty"`
 	HasPosition bool      `json:"has_position"`
 	Latitude    float64   `json:"latitude,omitempty"`
 	Longitude   float64   `json:"longitude,omitempty"`
@@ -91,7 +94,7 @@ func (s *Store) Ingest(port int, f ax25.Frame, a aprs.Packet) Packet {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nextID++
-	p := Packet{ID: s.nextID, ReceivedAt: now, Port: port, Source: f.Source.String(), Destination: f.Destination.String(), Path: path, TNC2: f.TNC2(), Info: string(f.Info), RawHex: f.RawHex, Kind: a.Kind, HasPosition: a.HasPosition, Latitude: a.Latitude, Longitude: a.Longitude, SymbolTable: a.SymbolTable, SymbolCode: a.SymbolCode, Comment: a.Comment}
+	p := Packet{ID: s.nextID, ReceivedAt: now, Port: port, Source: f.Source.String(), Destination: f.Destination.String(), Path: path, TNC2: f.TNC2(), Info: string(f.Info), RawHex: f.RawHex, Kind: a.Kind, FrameType: f.FrameType(), Control: f.Control, PID: f.PID, HasPosition: a.HasPosition, Latitude: a.Latitude, Longitude: a.Longitude, SymbolTable: a.SymbolTable, SymbolCode: a.SymbolCode, Comment: a.Comment}
 	s.packets = append(s.packets, p)
 	if len(s.packets) > s.maxPackets {
 		s.packets = append([]Packet(nil), s.packets[len(s.packets)-s.maxPackets:]...)
