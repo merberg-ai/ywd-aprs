@@ -134,7 +134,8 @@ func (s *Store) Snapshot(limit int) Snapshot {
 	if limit <= 0 || limit > len(s.packets) {
 		limit = len(s.packets)
 	}
-	packets := append([]Packet(nil), s.packets[len(s.packets)-limit:]...)
+	packets := make([]Packet, limit)
+	copy(packets, s.packets[len(s.packets)-limit:])
 	for i, j := 0, len(packets)-1; i < j; i, j = i+1, j-1 {
 		packets[i], packets[j] = packets[j], packets[i]
 	}
