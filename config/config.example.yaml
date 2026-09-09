@@ -21,8 +21,8 @@ logging:
   packet_file: /var/lib/ywd-aprs/packets.jsonl
 
 maps:
-  tile_url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-  attribution: "OpenStreetMap contributors"
+  tile_url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+  attribution: "OpenStreetMap contributors / CARTO"
 
 tx:
   enabled: false
